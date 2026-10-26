@@ -1,8 +1,125 @@
 <!DOCTYPE html>
-<html>
-  <body style="width:220px;font-family:sans-serif">
-    <h3>Example TEST Okumet</h3>
-    <button id="btn">Holaaaaaaaaaaaaaaa</button>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Okumet Document Access</title>
+    <link rel="stylesheet" href="popup.css" />
+  </head>
+  <body>
+    <div class="app" id="app">
+
+      <!-- ===================== LOGIN VIEW ===================== -->
+      <section id="view-login" class="view view-login">
+        <div class="login-card">
+          <div class="brand">
+            <img src="icon.png" alt="Okumet" class="brand-logo" />
+            <div class="brand-text">
+              <h1>Okumet</h1>
+              <span>Document Access</span>
+            </div>
+          </div>
+
+          <p class="login-subtitle">Inicia sesión para acceder a tus documentos de SINOE</p>
+
+          <form id="login-form" class="login-form">
+            <label class="field">
+              <span>Correo electrónico</span>
+              <input type="email" name="email" placeholder="correo@ejemplo.com" autocomplete="email" required />
+            </label>
+
+            <label class="field">
+              <span>Contraseña</span>
+              <input type="password" name="password" placeholder="••••••••" autocomplete="current-password" required />
+            </label>
+
+            <button type="submit" class="btn btn-primary">Iniciar sesión</button>
+          </form>
+
+          <a href="#" class="login-forgot">¿Olvidaste tu contraseña?</a>
+        </div>
+      </section>
+
+      <!-- ===================== WORKSPACE VIEW ===================== -->
+      <section id="view-workspace" class="view view-workspace hidden">
+
+        <header class="topbar">
+          <div class="topbar-brand">
+            <img src="icon.png" alt="Okumet" />
+          </div>
+
+          <nav class="topbar-tabs" role="tablist">
+            <button class="tab-btn active" data-tab="documentos" type="button">Documentos</button>
+            <button class="tab-btn" data-tab="notificaciones" type="button">Notificaciones</button>
+          </nav>
+
+          <div class="profile-wrap">
+            <button id="profile-btn" class="profile-btn" type="button" aria-haspopup="true" aria-expanded="false" aria-label="Perfil">
+              EM
+            </button>
+            <div id="profile-menu" class="profile-menu hidden">
+              <button id="go-panel" class="profile-menu-item" type="button">
+                Ir al panel
+              </button>
+              <button id="logout" class="profile-menu-item profile-menu-item--danger" type="button">
+                Cerrar sesión
+              </button>
+            </div>
+          </div>
+        </header>
+
+        <!-- Connection status banner (populated by JS based on active tab) -->
+        <div id="status-banner" class="status-banner"></div>
+
+        <!-- Tab panels -->
+        <div class="tab-panels">
+          <div class="tab-panel active" id="panel-documentos">
+            <ul class="mock-list">
+              <li class="mock-item">
+                <span class="mock-item-icon">📄</span>
+                <div class="mock-item-text">
+                  <strong>Resolución N° 00123-2026</strong>
+                  <small>Expediente 00456-2025-0-1801-JR-CI-05</small>
+                </div>
+              </li>
+              <li class="mock-item">
+                <span class="mock-item-icon">📄</span>
+                <div class="mock-item-text">
+                  <strong>Notificación de audiencia</strong>
+                  <small>Expediente 00789-2025-0-1801-JR-CI-05</small>
+                </div>
+              </li>
+              <li class="mock-item">
+                <span class="mock-item-icon">📄</span>
+                <div class="mock-item-text">
+                  <strong>Cédula de notificación</strong>
+                  <small>Expediente 00321-2024-0-1801-JR-CI-05</small>
+                </div>
+              </li>
+            </ul>
+          </div>
+
+          <div class="tab-panel" id="panel-notificaciones">
+            <ul class="mock-list">
+              <li class="mock-item">
+                <span class="mock-item-icon">🔔</span>
+                <div class="mock-item-text">
+                  <strong>Nuevo documento disponible</strong>
+                  <small>Hace 2 horas</small>
+                </div>
+              </li>
+              <li class="mock-item">
+                <span class="mock-item-icon">🔔</span>
+                <div class="mock-item-text">
+                  <strong>Casilla sincronizada</strong>
+                  <small>Hace 1 día</small>
+                </div>
+              </li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
+    </div>
     <script src="popup.js"></script>
   </body>
 </html>
