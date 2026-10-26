@@ -1,0 +1,14 @@
+{
+  "manifest_version": 3,
+  "name": "Okumet Document Access",
+  "version": "1.0",
+  "description": "Acceso SINOE mediente la autorización y valdiación de la persona (usuario)",
+  "action": {
+    "default_popup": "popup.html",
+    "default_icon": {
+      "16": "icon.png",
+      "32": "icon.png"
+    }
+  },
+  "permissions": ["storage", "activeTab", "scripting"]
+}
