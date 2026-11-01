@@ -10,5 +10,27 @@
       "32": "icon.png"
     }
   },
-  "permissions": ["storage", "activeTab", "scripting"]
+  "side_panel": {
+    "default_path": "popup.html?context=panel"
+  },
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://casillas.pj.gob.pe/sinoe/pages/seguridad/sso/sso-menu-app.xhtml*",
+        "https://casillas.pj.gob.pe/sinoe/pages/casillas/notificaciones/notificacion-bandeja.xhtml*",
+        "https://casillas.pj.gob.pe/sinoe/pages/casillas/gestion/abogadoDefensorPublico.xhtml*"
+      ],
+      "js": ["content-bandeja.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "permissions": ["storage", "activeTab", "scripting", "sidePanel"],
+  "host_permissions": [
+    "https://api.okumet.com/*",
+    "https://casillas.pj.gob.pe/*",
+    "http://localhost:8000/*"
+  ]
 }

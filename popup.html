@@ -6,7 +6,7 @@
     <link rel="stylesheet" href="popup.css" />
   </head>
   <body>
-    <div class="app" id="app">
+    <div class="app app-loading" id="app">
 
       <!-- ===================== LOGIN VIEW ===================== -->
       <section id="view-login" class="view view-login">
@@ -32,7 +32,9 @@
               <input type="password" name="password" placeholder="••••••••" autocomplete="current-password" required />
             </label>
 
-            <button type="submit" class="btn btn-primary">Iniciar sesión</button>
+            <p id="login-error" class="login-error"></p>
+
+            <button type="submit" id="login-submit" class="btn btn-primary">Iniciar sesión</button>
           </form>
 
           <a href="#" class="login-forgot">¿Olvidaste tu contraseña?</a>
@@ -48,13 +50,15 @@
           </div>
 
           <nav class="topbar-tabs" role="tablist">
-            <button class="tab-btn active" data-tab="documentos" type="button">Documentos</button>
-            <button class="tab-btn" data-tab="notificaciones" type="button">Notificaciones</button>
+            <button class="tab-btn active" data-tab="documentos" type="button">Pendientes</button>
+            <button class="tab-btn" data-tab="sincronizados" type="button">Sincronizados</button>
           </nav>
 
           <div class="profile-wrap">
             <button id="profile-btn" class="profile-btn" type="button" aria-haspopup="true" aria-expanded="false" aria-label="Perfil">
-              EM
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M12 12c2.76 0 5-2.24 5-5s-2.24-5-5-5-5 2.24-5 5 2.24 5 5 5zm0 2c-3.33 0-10 1.67-10 5v3h20v-3c0-3.33-6.67-5-10-5z" />
+              </svg>
             </button>
             <div id="profile-menu" class="profile-menu hidden">
               <button id="go-panel" class="profile-menu-item" type="button">
@@ -73,51 +77,26 @@
         <!-- Tab panels -->
         <div class="tab-panels">
           <div class="tab-panel active" id="panel-documentos">
-            <ul class="mock-list">
-              <li class="mock-item">
-                <span class="mock-item-icon">📄</span>
-                <div class="mock-item-text">
-                  <strong>Resolución N° 00123-2026</strong>
-                  <small>Expediente 00456-2025-0-1801-JR-CI-05</small>
-                </div>
-              </li>
-              <li class="mock-item">
-                <span class="mock-item-icon">📄</span>
-                <div class="mock-item-text">
-                  <strong>Notificación de audiencia</strong>
-                  <small>Expediente 00789-2025-0-1801-JR-CI-05</small>
-                </div>
-              </li>
-              <li class="mock-item">
-                <span class="mock-item-icon">📄</span>
-                <div class="mock-item-text">
-                  <strong>Cédula de notificación</strong>
-                  <small>Expediente 00321-2024-0-1801-JR-CI-05</small>
-                </div>
-              </li>
-            </ul>
+            <ul class="pending-list" id="pending-list"></ul>
+            <p class="empty-state" id="pending-empty">Todavía no hay documentos pendientes.</p>
           </div>
 
-          <div class="tab-panel" id="panel-notificaciones">
-            <ul class="mock-list">
-              <li class="mock-item">
-                <span class="mock-item-icon">🔔</span>
-                <div class="mock-item-text">
-                  <strong>Nuevo documento disponible</strong>
-                  <small>Hace 2 horas</small>
-                </div>
-              </li>
-              <li class="mock-item">
-                <span class="mock-item-icon">🔔</span>
-                <div class="mock-item-text">
-                  <strong>Casilla sincronizada</strong>
-                  <small>Hace 1 día</small>
-                </div>
-              </li>
-            </ul>
+          <div class="tab-panel" id="panel-sincronizados">
+            <ul class="pending-list" id="synced-list"></ul>
+            <p class="empty-state" id="synced-empty">Todavía no hay nada sincronizado.</p>
           </div>
         </div>
       </section>
+
+      <!-- ===================== MODAL DE VALIDACIÓN DE IDENTIDAD ===================== -->
+      <div id="identity-modal" class="identity-modal hidden" role="status" aria-live="polite">
+        <div class="identity-modal-card">
+          <img src="icon.png" alt="Okumet" class="identity-modal-logo" />
+          <div class="spinner spinner-lg"></div>
+          <p class="identity-modal-title">Verificando identidad</p>
+          <p id="identity-modal-message" class="identity-modal-message">Preparando validación…</p>
+        </div>
+      </div>
 
     </div>
     <script src="popup.js"></script>

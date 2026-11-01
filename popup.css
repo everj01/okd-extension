@@ -2,6 +2,7 @@
   --navy-900: #0f2744;
   --navy-800: #17365c;
   --navy-700: #1f4572;
+  --amber-50: #fffbeb;
   --amber-500: #f5a623;
   --amber-600: #dd9112;
   --green-500: #16a34a;
@@ -23,8 +24,13 @@
   box-sizing: border-box;
 }
 
+html,
 body {
   margin: 0;
+  height: 100%;
+}
+
+body {
   width: 360px;
   font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
   background: var(--slate-50);
@@ -33,6 +39,91 @@ body {
 
 .hidden {
   display: none !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    transition-duration: 0.001ms !important;
+  }
+}
+
+/* ===================== MICRO-ANIMACIONES ===================== */
+/* Solo CSS, sin librerías: entrada suave de la app y de cada vista para que
+   no se sienta estático, sin agregar peso real al bundle. */
+
+.app {
+  opacity: 1;
+  transition: opacity 0.15s ease;
+}
+
+.app-loading {
+  visibility: hidden;
+  opacity: 0;
+}
+
+.view:not(.hidden) {
+  animation: viewFadeIn 0.22s ease;
+}
+
+@keyframes viewFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* ===================== MODO SIDE PANEL ===================== */
+/* Mismo HTML/CSS que el popup clásico; cuando se abre como side panel
+   (manifest "side_panel"), popup.js agrega .is-panel al body y el layout
+   pasa de "flotante y compacto" a "columna de alto completo". */
+
+body.is-panel {
+  width: 100%;
+  min-width: 300px;
+  max-width: none;
+  height: 100vh;
+  overflow: hidden;
+}
+
+body.is-panel .app {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+body.is-panel .view {
+  flex: 1;
+  min-height: 0;
+}
+
+body.is-panel .view-login {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+body.is-panel .login-card {
+  width: 100%;
+  max-width: 340px;
+}
+
+body.is-panel .view-workspace {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+body.is-panel .tab-panels {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
 }
 
 /* ===================== LOGIN VIEW ===================== */
@@ -138,6 +229,26 @@ body {
   filter: brightness(1.05);
 }
 
+.btn-primary:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+  filter: none;
+}
+
+.login-error {
+  display: none;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--red-500);
+  background: var(--red-50);
+  border-radius: 8px;
+  padding: 8px 10px;
+}
+
+.login-error.visible {
+  display: block;
+}
+
 .login-forgot {
   display: block;
   text-align: center;
@@ -203,6 +314,11 @@ body {
 
 .profile-wrap {
   position: relative;
+  /* Mantiene el perfil siempre pegado al borde derecho del topbar, aunque
+     .topbar-tabs (el elemento flex:1 que normalmente lo empuja) esté
+     oculto por el bloqueo — si no, el botón y su menú quedan junto al
+     logo, a la izquierda, en vez de en su lugar habitual. */
+  margin-left: auto;
 }
 
 .profile-btn {
@@ -212,12 +328,17 @@ body {
   border: 1.5px solid var(--amber-500);
   background: var(--navy-700);
   color: var(--amber-500);
-  font-size: 11px;
-  font-weight: 700;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
+  padding: 0;
+}
+
+.profile-btn svg {
+  width: 16px;
+  height: 16px;
+  fill: currentColor;
 }
 
 .profile-menu {
@@ -231,6 +352,22 @@ body {
   min-width: 150px;
   z-index: 10;
   border: 1px solid var(--slate-200);
+  transform-origin: top right;
+}
+
+.profile-menu:not(.hidden) {
+  animation: menuPop 0.15s ease;
+}
+
+@keyframes menuPop {
+  from {
+    opacity: 0;
+    transform: scale(0.95) translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
 }
 
 .profile-menu-item {
@@ -270,12 +407,77 @@ body {
   display: flex;
   flex-direction: column;
   gap: 8px;
+  opacity: 1;
+  transition: opacity 0.12s ease;
 }
 
-.status-banner.is-waiting {
-  background: var(--slate-100);
-  border: 1px dashed var(--slate-300, #cbd5e1);
-  color: var(--slate-600);
+.status-icon {
+  display: none;
+}
+
+/* ===================== BLOQUEO TOTAL (fuera de SINOE autenticado) ===================== */
+/* Mientras no se esté exactamente en la página SSO logeada, no se muestra
+   ni el menú de pestañas ni el contenido de documentos/notificaciones:
+   solo el mensaje de bloqueo, grande y centrado. */
+
+.view-workspace.is-locked .topbar-tabs,
+.view-workspace.is-locked .tab-panels {
+  display: none !important;
+}
+
+.view-workspace.is-locked {
+  flex: 1;
+  min-height: 0;
+}
+
+.view-workspace.is-locked .status-banner {
+  flex: 1;
+  min-height: 220px;
+  margin: 0;
+  border-radius: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  gap: 10px;
+  padding: 32px 24px;
+}
+
+.view-workspace.is-locked .status-dot {
+  display: none;
+}
+
+.view-workspace.is-locked .status-icon {
+  display: block;
+  font-size: 32px;
+  line-height: 1;
+}
+
+.view-workspace.is-locked .status-title {
+  font-size: 14px;
+}
+
+.view-workspace.is-locked .status-subtitle {
+  max-width: 260px;
+  font-size: 12px;
+}
+
+.view-workspace.is-locked .status-banner .btn-validate {
+  align-self: center;
+  margin-top: 4px;
+}
+
+.status-banner.is-blocked {
+  background: var(--red-50);
+  border: 1px solid #fecdd3;
+  color: var(--red-500);
+}
+
+.status-banner.is-pending {
+  background: var(--amber-50, #fffbeb);
+  border: 1px solid #fde68a;
+  color: var(--amber-600);
 }
 
 .status-banner.is-connected {
@@ -297,9 +499,14 @@ body {
   flex: none;
 }
 
-.is-waiting .status-dot {
-  background: var(--slate-400);
-  box-shadow: 0 0 0 3px rgba(148, 163, 184, 0.25);
+.is-blocked .status-dot {
+  background: var(--red-500);
+  box-shadow: 0 0 0 3px rgba(225, 29, 72, 0.18);
+}
+
+.is-pending .status-dot {
+  background: var(--amber-500);
+  box-shadow: 0 0 0 3px rgba(245, 166, 35, 0.22);
 }
 
 .is-connected .status-dot {
@@ -322,6 +529,134 @@ body {
   color: inherit;
   opacity: 0.85;
   line-height: 1.4;
+}
+
+.identity-box {
+  margin-top: 2px;
+  background: #fff;
+  border: 1px solid #bbf7d0;
+  border-radius: 8px;
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.spinner {
+  width: 13px;
+  height: 13px;
+  flex: none;
+  border: 2px solid var(--slate-200);
+  border-top-color: var(--navy-700);
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.spinner-lg {
+  width: 30px;
+  height: 30px;
+  border-width: 3px;
+  border-color: rgba(245, 166, 35, 0.25);
+  border-top-color: var(--amber-500);
+}
+
+/* ===================== MODAL DE VALIDACIÓN DE IDENTIDAD ===================== */
+/* Vive DENTRO de la propia extensión (no se inyecta en la página de
+   SINOE) — cubre el contenido del popup/panel mientras se valida, con la
+   identidad visual de Okumet, para que la espera se sienta deliberada en
+   vez de instantánea. */
+
+.identity-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(15, 39, 68, 0.55);
+  backdrop-filter: blur(1px);
+  animation: modalFadeIn 0.18s ease;
+}
+
+@keyframes modalFadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.identity-modal-card {
+  width: min(85%, 280px);
+  background: #fff;
+  border-radius: 14px;
+  padding: 24px 20px;
+  box-shadow: 0 20px 45px rgba(15, 23, 42, 0.35);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  text-align: center;
+}
+
+.identity-modal-logo {
+  width: 36px;
+  height: 36px;
+  margin-bottom: 4px;
+}
+
+.identity-modal-title {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--navy-900);
+}
+
+.identity-modal-message {
+  margin: 0;
+  font-size: 12px;
+  color: var(--slate-600);
+  line-height: 1.4;
+  min-height: 2.6em;
+}
+
+.btn-validate {
+  align-self: flex-start;
+  background: var(--navy-800);
+  color: #fff;
+  font-size: 12px;
+  padding: 7px 14px;
+}
+
+.btn-validate:hover {
+  filter: brightness(1.1);
+}
+
+.btn-validate:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+
+.identity-result {
+  margin: 0;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.identity-result.is-ok {
+  color: var(--green-600);
+}
+
+.identity-result.is-error {
+  color: var(--red-500);
 }
 
 .consent-box {
@@ -379,9 +714,26 @@ body {
 
 .tab-panel.active {
   display: block;
+  animation: panelFadeIn 0.18s ease;
 }
 
-.mock-list {
+@keyframes panelFadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.empty-state {
+  margin: 20px 0;
+  text-align: center;
+  font-size: 12px;
+  color: var(--slate-500);
+}
+
+.pending-list {
   list-style: none;
   margin: 0;
   padding: 0;
@@ -390,9 +742,13 @@ body {
   gap: 6px;
 }
 
-.mock-item {
+.pending-list:empty {
+  display: none;
+}
+
+.pending-item {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 10px;
   background: #fff;
   border: 1px solid var(--slate-200);
@@ -400,22 +756,65 @@ body {
   padding: 9px 10px;
 }
 
-.mock-item-icon {
+.pending-item-icon {
   font-size: 16px;
 }
 
-.mock-item-text {
+.pending-item-text {
   display: flex;
   flex-direction: column;
   gap: 2px;
+  min-width: 0;
+  flex: 1;
 }
 
-.mock-item-text strong {
+.pending-sync-btn {
+  flex: none;
+  align-self: center;
+  margin-left: auto;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  border: none;
+  background: var(--navy-700);
+  color: #fff;
+  font-size: 13px;
+  line-height: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.pending-sync-btn:hover {
+  filter: brightness(1.15);
+}
+
+.pending-sync-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.pending-sync-btn svg {
+  width: 14px;
+  height: 14px;
+  fill: currentColor;
+}
+
+.pending-sync-btn.is-busy svg {
+  animation: spin 0.7s linear infinite;
+}
+
+.pending-sync-btn.sync-error {
+  background: var(--red-500);
+}
+
+.pending-item-text strong {
   font-size: 12px;
   color: var(--slate-800);
 }
 
-.mock-item-text small {
+.pending-item-text small {
   font-size: 10.5px;
   color: var(--slate-500);
 }
