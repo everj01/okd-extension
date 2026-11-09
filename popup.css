@@ -27,7 +27,6 @@
 html,
 body {
   margin: 0;
-  height: 100%;
 }
 
 body {
@@ -35,6 +34,22 @@ body {
   font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
   background: var(--slate-50);
   color: var(--slate-800);
+}
+
+/* Chrome limita la altura de un popup clásico a ~600px — en vez de dejar
+   que el navegador recorte o se comporte raro con listas largas
+   (Pendientes/Sincronizados pueden crecer bastante), se fija un tope
+   propio con scroll interno controlado por nosotros. Acotado a
+   ":not(.is-panel)" para no competir con el "height: 100vh" del modo side
+   panel (ahí sí debe ocupar el alto completo de la ventana). Tampoco
+   aplica el borde redondeado ahí — el side panel va pegado al borde del
+   navegador, no es una ventana flotante. */
+body:not(.is-panel) {
+  width: 400px;
+  max-height: 620px;
+  overflow-x: hidden;
+  overflow-y: auto;
+  border-radius: 14px;
 }
 
 .hidden {
@@ -809,6 +824,22 @@ body.is-panel .tab-panels {
   background: var(--red-500);
 }
 
+.pending-sync-btn.needs-confirm {
+  background: var(--amber-500);
+  color: var(--navy-900);
+  animation: pulseConfirm 0.9s ease-in-out infinite;
+}
+
+@keyframes pulseConfirm {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(245, 166, 35, 0.5);
+  }
+  50% {
+    box-shadow: 0 0 0 5px rgba(245, 166, 35, 0);
+  }
+}
+
 .pending-item-text strong {
   font-size: 12px;
   color: var(--slate-800);
@@ -817,4 +848,10 @@ body.is-panel .tab-panels {
 .pending-item-text small {
   font-size: 10.5px;
   color: var(--slate-500);
+}
+
+.pending-item-text .pending-item-tag {
+  margin-top: 2px;
+  font-weight: 600;
+  color: var(--green-600);
 }

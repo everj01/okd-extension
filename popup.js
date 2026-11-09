@@ -751,7 +751,25 @@ async function initIdentitySection() {
 
   if (!document.getElementById('identity-box')) return;
 
-  if (stored && (stored.status === 'ok' || stored.status === 'error')) {
+  if (stored && stored.status === 'ok') {
+    // La identidad ya validada (DNI/colegiatura) no se vuelve a revisar
+    // acá — eso sigue cacheado a propósito, para no repetir el click en
+    // SINOE. Pero "confirmarOda" SÍ se recalcula con el usuario fresco
+    // (restoreSession ya lo actualizó desde /api/yo al abrir el popup):
+    // sin esto, confirmar el acceso en una sesión anterior — o cambiarlo
+    // directo en la BD — nunca se reflejaba hasta el siguiente login.
+    const usuarioFresco = await getStoredUsuario();
+    const confirmarOda = Boolean(usuarioFresco && usuarioFresco.confirmar_oda);
+
+    identityState =
+      confirmarOda === stored.confirmarOda ? stored : { status: 'ok', confirmarOda };
+    if (identityState !== stored) await setStoredIdentityState(identityState);
+
+    renderIdentitySection();
+    return;
+  }
+
+  if (stored && stored.status === 'error') {
     identityState = stored;
     renderIdentitySection();
     return;
@@ -894,7 +912,16 @@ async function callSinoeAuthEndpoint(path) {
       headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' },
     });
     if (!res.ok) return null;
-    return await res.json();
+    const data = await res.json();
+    // La respuesta viene envuelta como {"usuario": {...}}, igual que
+    // /api/login y /api/yo — se desenvuelve ACÁ, una sola vez, para que
+    // cualquier llamador pueda tratar el resultado como el usuario plano
+    // (leer .confirmar_oda directo, pasarlo a updateStoredUsuario, etc.)
+    // sin tener que acordarse del wrapper cada vez. Devolver el objeto
+    // envuelto tal cual fue justo el bug: markAbogadoHabilitado terminaba
+    // guardando { usuario: {...} } en vez de {...} en el storage local,
+    // pisando el usuario bueno que restoreSession ya había guardado bien.
+    return data.usuario || null;
   } catch (err) {
     return null;
   }
@@ -916,6 +943,64 @@ async function confirmarAccesoOda() {
   const usuario = await callSinoeAuthEndpoint('/sinoe/confirmar-acceso');
   if (usuario) await updateStoredUsuario(usuario);
   return usuario;
+}
+
+// GET /api/sinoe/expedientes: la verdad real de qué ya está guardado en
+// Okumet para este abogado (origen: 'sinoe'). Nunca lanza — si falla, se
+// trata como "no se pudo confirmar nada" (lista vacía), nunca se asume
+// que algo existe cuando no se pudo verificar.
+async function fetchSinoeExpedientes() {
+  const token = await getStoredToken();
+  if (!token) return [];
+
+  try {
+    const res = await fetch(`${API_BASE}/sinoe/expedientes?por_pagina=100`, {
+      headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' },
+    });
+    if (!res.ok) return [];
+    const data = await res.json();
+    return Array.isArray(data.data) ? data.data : [];
+  } catch (err) {
+    return [];
+  }
+}
+
+// Se llama al iniciar sesión (restoreSession). Reconstruye "Sincronizados"
+// con la verdad real del backend, en vez de depender de lo que haya
+// quedado en storage local — así, cerrar/abrir sesión (o entrar desde
+// otra pestaña) no hace que algo YA guardado en Okumet vuelva a aparecer
+// como "pendiente" en SINOE. También limpia de "Pendientes" cualquier
+// notificación que el backend ya tenga confirmada.
+async function reconciliarListasConBackend() {
+  const expedientes = await fetchSinoeExpedientes();
+
+  const sincronizados = [];
+  const notificacionesSincronizadas = new Set();
+
+  expedientes.forEach((exp) => {
+    const notificaciones = Array.isArray(exp.numeros_notificacion) ? exp.numeros_notificacion : [];
+    notificaciones.forEach((numeroNotificacion) => {
+      notificacionesSincronizadas.add(numeroNotificacion);
+      sincronizados.push({
+        numeroNotificacion,
+        numeroExpediente: exp.codigo,
+        sumilla: exp.titulo || '',
+        juzgado: '',
+        fecha: '',
+      });
+    });
+  });
+
+  const { okumetPendingExpedientes } = await chrome.storage.local.get('okumetPendingExpedientes');
+  const pendientesActuales = Array.isArray(okumetPendingExpedientes) ? okumetPendingExpedientes : [];
+  const pendientesFiltrados = pendientesActuales.filter(
+    (item) => !notificacionesSincronizadas.has(item.numeroNotificacion)
+  );
+
+  await chrome.storage.local.set({
+    okumetSyncedExpedientes: sincronizados,
+    okumetPendingExpedientes: pendientesFiltrados,
+  });
 }
 
 // Sube el PDF capturado + sus metadatos a POST /api/sinoe/expedientes.
@@ -1021,6 +1106,7 @@ async function renderPendientesTab() {
             type="button"
             class="pending-sync-btn"
             data-numero="${escapeHtml(item.numeroNotificacion)}"
+            data-numero-expediente="${escapeHtml(item.numeroExpediente)}"
             title="Abrir anexos en SINOE"
           >
             <svg viewBox="0 0 24 24" aria-hidden="true">
@@ -1051,18 +1137,37 @@ async function renderSincronizadosTab() {
 
   syncedEmpty.classList.add('hidden');
   syncedList.innerHTML = items
-    .map(
-      (item) => `
+    .map((item) => {
+      // El backend nunca sobrescribe el expediente/caso en sí — esta
+      // etiqueta solo aclara qué pasó con ESTE documento puntual: si ya
+      // existía (se reemplazó su PDF) o se agregó a un expediente que ya
+      // tenía otros documentos. Solo se conoce justo después de sincronizar
+      // en esta misma sesión — los reconciliados desde el backend
+      // (fetchSinoeExpedientes) no la tienen, y no corresponde inventarla.
+      const etiqueta =
+        item.documentoActualizado === true
+          ? '🔁 Documento actualizado'
+          : item.documentoActualizado === false
+          ? '📎 Documento agregado al expediente'
+          : '';
+
+      // juzgado/fecha no vienen del endpoint de reconciliación (solo de
+      // una sincronización fresca en esta sesión) — se omite la línea
+      // entera en vez de mostrar un "·" colgado sin nada alrededor.
+      const juzgadoFecha = [item.juzgado, item.fecha].filter(Boolean).join(' · ');
+
+      return `
         <li class="pending-item">
           <span class="pending-item-icon">✅</span>
           <div class="pending-item-text">
             <strong>${escapeHtml(item.numeroExpediente)}</strong>
-            <small>${escapeHtml(item.sumilla)}</small>
-            <small>${escapeHtml(item.juzgado)} · ${escapeHtml(item.fecha)}</small>
+            ${item.sumilla ? `<small>${escapeHtml(item.sumilla)}</small>` : ''}
+            ${juzgadoFecha ? `<small>${escapeHtml(juzgadoFecha)}</small>` : ''}
+            ${etiqueta ? `<small class="pending-item-tag">${etiqueta}</small>` : ''}
           </div>
         </li>
-      `
-    )
+      `;
+    })
     .join('');
 }
 
@@ -1146,7 +1251,7 @@ const SYNC_RESULT_MESSAGES = {
 // después de que el backend confirmó la subida con éxito, nunca antes
 // (si la subida falla, el expediente se queda en Pendientes para
 // reintentar, en vez de mentir sobre su estado real).
-async function moverExpedienteASincronizados(expediente) {
+async function moverExpedienteASincronizados(expediente, documentoActualizado) {
   const { okumetPendingExpedientes, okumetSyncedExpedientes } = await chrome.storage.local.get([
     'okumetPendingExpedientes',
     'okumetSyncedExpedientes',
@@ -1158,8 +1263,15 @@ async function moverExpedienteASincronizados(expediente) {
   const nuevosPendientes = pendientes.filter(
     (item) => item.numeroNotificacion !== expediente.numeroNotificacion
   );
-  const yaEstaba = sincronizados.some((item) => item.numeroNotificacion === expediente.numeroNotificacion);
-  const nuevosSincronizados = yaEstaba ? sincronizados : [...sincronizados, expediente];
+
+  // Siempre se reemplaza la entrada (no solo se agrega si falta) — así,
+  // si la misma notificación se vuelve a sincronizar, el flag
+  // "documentoActualizado" queda al día en vez de conservar el de la
+  // primera vez.
+  const otrosSincronizados = sincronizados.filter(
+    (item) => item.numeroNotificacion !== expediente.numeroNotificacion
+  );
+  const nuevosSincronizados = [...otrosSincronizados, { ...expediente, documentoActualizado }];
 
   await chrome.storage.local.set({
     okumetPendingExpedientes: nuevosPendientes,
@@ -1172,6 +1284,41 @@ pendingList?.addEventListener('click', async (e) => {
   if (!btn || btn.disabled) return;
 
   const numero = btn.dataset.numero;
+  const numeroExpediente = btn.dataset.numeroExpediente;
+
+  // Primer click: si este N° de expediente ya existe en Okumet (bajo OTRA
+  // notificación — lo sabemos por la reconciliación con el backend al
+  // iniciar sesión), se avisa en vez de subir directo. Un segundo click
+  // dentro de los próximos 8s confirma y recién ahí sincroniza; si no se
+  // confirma a tiempo, vuelve a su estado normal — nunca sube nada sin
+  // que el usuario haya visto el aviso.
+  if (btn.dataset.pendingConfirm !== 'true') {
+    const { okumetSyncedExpedientes } = await chrome.storage.local.get('okumetSyncedExpedientes');
+    const sincronizados = Array.isArray(okumetSyncedExpedientes) ? okumetSyncedExpedientes : [];
+    const yaExiste = sincronizados.find(
+      (item) => item.numeroExpediente === numeroExpediente && item.numeroNotificacion !== numero
+    );
+
+    if (yaExiste) {
+      btn.dataset.pendingConfirm = 'true';
+      btn.classList.add('needs-confirm');
+      btn.title = 'Este expediente ya existe en Okumet — presiona de nuevo para agregar este documento también.';
+
+      clearTimeout(btn._okumetConfirmTimeout);
+      btn._okumetConfirmTimeout = setTimeout(() => {
+        delete btn.dataset.pendingConfirm;
+        btn.classList.remove('needs-confirm');
+        btn.title = 'Abrir anexos en SINOE';
+      }, 8000);
+
+      return;
+    }
+  }
+
+  clearTimeout(btn._okumetConfirmTimeout);
+  delete btn.dataset.pendingConfirm;
+  btn.classList.remove('needs-confirm');
+
   btn.disabled = true;
   btn.classList.add('is-busy');
 
@@ -1190,7 +1337,7 @@ pendingList?.addEventListener('click', async (e) => {
       // la lista, y esta tarjeta (con este mismo botón) desaparece de ahí
       // — cualquier cosa que le hiciéramos al nodo después sería sobre un
       // elemento ya desconectado del documento, invisible para el usuario.
-      await moverExpedienteASincronizados(resultado.expediente);
+      await moverExpedienteASincronizados(resultado.expediente, subida.documentoActualizado);
       return;
     }
 
@@ -1314,7 +1461,21 @@ loginForm.addEventListener('submit', async (e) => {
       return;
     }
 
+    // IMPORTANTE: antes se descartaba este body por completo. Sin esto,
+    // `okumetUsuario` (y por lo tanto `confirmar_oda`) quedaba "congelado"
+    // en lo que era al momento del login — si confirmabas el acceso o se
+    // actualizaba algo en la BD después, la extensión nunca se enteraba
+    // hasta el próximo login real.
+    const data = await res.json().catch(() => ({}));
+    if (data.usuario) await updateStoredUsuario(data.usuario);
+
     showWorkspace();
+
+    // Sin esperar: la UI ya se mostró con lo que había en storage, y los
+    // listeners de storage.onChanged (ver renderPendientesTab/
+    // renderSincronizadosTab) refrescan solos las pestañas en cuanto esto
+    // termine — no hace falta retrasar el render inicial por esta llamada.
+    reconciliarListasConBackend();
   } catch (err) {
     // Sin conexión: no se puede validar el token, se deja la vista de login.
     showLogin();

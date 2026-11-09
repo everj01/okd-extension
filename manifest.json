@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "Okumet Document Access",
   "version": "1.0",
-  "description": "Acceso SINOE mediente la autorización y valdiación de la persona (usuario)",
+  "description": "Sincroniza tus notificaciones de SINOE con Okumet Document, previa autorización y validación de identidad.",
   "action": {
     "default_popup": "popup.html",
     "default_icon": {
@@ -12,9 +12,6 @@
   },
   "side_panel": {
     "default_path": "popup.html?context=panel"
-  },
-  "background": {
-    "service_worker": "background.js"
   },
   "content_scripts": [
     {
